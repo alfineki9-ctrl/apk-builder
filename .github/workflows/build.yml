@@ -131,8 +131,21 @@ jobs:
             sed -i '/ndkVersion/d' android/app/build.gradle 2>/dev/null || true
           fi
 
-          # 4. Ambil dependencies & Build APK
+          # 4. Patch Flutter SDK IconData (Fix breaking change in Flutter 3.27+ for font_awesome_flutter & older packages)
+          FLUTTER_ROOT=$(dirname $(dirname $(which flutter)))
+          echo "Patching Flutter SDK in $FLUTTER_ROOT..."
+          find "$FLUTTER_ROOT" -name "icon_data.dart" -exec sed -i -E 's/(final|base|interface)[[:space:]]+class[[:space:]]+IconData/class IconData/g' {} + 2>/dev/null || true
+
+          # 5. Ambil dependencies
           flutter pub get
+
+          # Patch pub-cache as well if any package extends IconData
+          if [ -d "$HOME/.pub-cache" ]; then
+            echo "Patching pub-cache in $HOME/.pub-cache..."
+            find "$HOME/.pub-cache" -name "icon_data.dart" -exec sed -i -E 's/(final|base|interface)[[:space:]]+class[[:space:]]+IconData/class IconData/g' {} + 2>/dev/null || true
+          fi
+
+          # 6. Build Release APK
           flutter build apk --release --no-tree-shake-icons --android-skip-build-dependency-validation
 
       # ----------------------------------------------------
