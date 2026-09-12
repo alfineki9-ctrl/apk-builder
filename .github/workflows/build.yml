@@ -131,12 +131,22 @@ jobs:
             sed -i '/ndkVersion/d' android/app/build.gradle 2>/dev/null || true
           fi
 
-          # 4. Patch Flutter SDK IconData (Fix breaking change in Flutter 3.27+ for font_awesome_flutter & older packages)
+          # 4. Patch & Sanitasi Dependensi Flutter (Fix font_awesome_flutter 11 mismatch, minSdkVersion, dsb)
+          if [ -f "pubspec.yaml" ]; then
+            # Kembalikan font_awesome_flutter ke versi 10.7.0 yang stabil dan menggunakan IconData (bukan FaIconData)
+            sed -i -E 's/font_awesome_flutter:[[:space:]]*[\^~>=]*11[0-9.]*/font_awesome_flutter: ^10.7.0/g' pubspec.yaml
+            if grep -q "font_awesome_flutter: 11" pubspec.lock 2>/dev/null; then
+              echo "Mereset pubspec.lock agar resolve font_awesome_flutter 10.7.0..."
+              rm -f pubspec.lock
+            fi
+          fi
+
+          # 5. Patch Flutter SDK IconData (Fix breaking change in Flutter 3.27+ for font_awesome_flutter & older packages)
           FLUTTER_ROOT=$(dirname $(dirname $(which flutter)))
           echo "Patching Flutter SDK in $FLUTTER_ROOT..."
           find "$FLUTTER_ROOT" -name "icon_data.dart" -exec sed -i -E 's/(final|base|interface)[[:space:]]+class[[:space:]]+IconData/class IconData/g' {} + 2>/dev/null || true
 
-          # 5. Ambil dependencies
+          # 6. Ambil dependencies
           flutter pub get
 
           # Patch pub-cache as well if any package extends IconData
@@ -145,7 +155,11 @@ jobs:
             find "$HOME/.pub-cache" -name "icon_data.dart" -exec sed -i -E 's/(final|base|interface)[[:space:]]+class[[:space:]]+IconData/class IconData/g' {} + 2>/dev/null || true
           fi
 
-          # 6. Build Release APK
+          # 7. Pastikan minSdkVersion minimal 21 (mencegah kegagalan library modern)
+          find android -name "build.gradle" -exec sed -i -E 's/minSdkVersion[[:space:]]+[0-9]+/minSdkVersion 21/g' {} + 2>/dev/null || true
+          find android -name "build.gradle.kts" -exec sed -i -E 's/minSdk[[:space:]]*=[[:space:]]*[0-9]+/minSdk = 21/g' {} + 2>/dev/null || true
+
+          # 8. Build Release APK
           flutter build apk --release --no-tree-shake-icons --android-skip-build-dependency-validation
 
       # ----------------------------------------------------
