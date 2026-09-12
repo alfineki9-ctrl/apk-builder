@@ -107,8 +107,33 @@ jobs:
         run: |
           cd project_source
           chmod +x android/gradlew 2>/dev/null || true
+          
+          # 1. Optimasi konfigurasi Gradle & AGP
+          mkdir -p android
+          touch android/gradle.properties
+          echo "android.newDsl=false" >> android/gradle.properties
+          echo "android.useAndroidX=true" >> android/gradle.properties
+          echo "android.enableJetifier=true" >> android/gradle.properties
+          echo "org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m" >> android/gradle.properties
+
+          # 2. Upgrade Gradle wrapper jika versi 8.12 menjadi 8.14 (Flutter requirement)
+          if [ -f "android/gradle/wrapper/gradle-wrapper.properties" ]; then
+            sed -i 's/gradle-8.12-all.zip/gradle-8.14-all.zip/g' android/gradle/wrapper/gradle-wrapper.properties
+            sed -i 's/gradle-8.12-bin.zip/gradle-8.14-bin.zip/g' android/gradle/wrapper/gradle-wrapper.properties
+            sed -i 's/gradle-8.10-all.zip/gradle-8.14-all.zip/g' android/gradle/wrapper/gradle-wrapper.properties
+          fi
+
+          # 3. Hapus ndkVersion spesifik agar runner menggunakan default NDK
+          if [ -f "android/app/build.gradle.kts" ]; then
+            sed -i '/ndkVersion/d' android/app/build.gradle.kts 2>/dev/null || true
+          fi
+          if [ -f "android/app/build.gradle" ]; then
+            sed -i '/ndkVersion/d' android/app/build.gradle 2>/dev/null || true
+          fi
+
+          # 4. Ambil dependencies & Build APK
           flutter pub get
-          flutter build apk --release --no-tree-shake-icons
+          flutter build apk --release --no-tree-shake-icons --android-skip-build-dependency-validation
 
       # ----------------------------------------------------
       # PROSES BUILD NATIVE ANDROID (BASE 2)
